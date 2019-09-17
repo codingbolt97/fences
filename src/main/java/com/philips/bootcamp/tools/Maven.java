@@ -55,12 +55,6 @@ public class Maven implements Tool {
             else return false;
         }
 
-        if (settings.has("generateTestReport")) {
-            value = settings.get("generateTestReport").getAsString();
-            if (value.equals("yes") || value.equals("no")) ;
-            else return false;
-        }
-
         return true;
     }
 
@@ -68,7 +62,6 @@ public class Maven implements Tool {
     public JsonObject getDefaultSettings() {
         JsonObject defaults = new JsonObject();
         defaults.addProperty("command", "mvn package");
-        defaults.addProperty("generateTestReport", "no");
         return defaults;
     }
 }

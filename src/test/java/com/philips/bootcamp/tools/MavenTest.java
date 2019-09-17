@@ -36,7 +36,6 @@ public class MavenTest {
         
         JsonObject expectedDefault = new JsonObject();
         expectedDefault.addProperty("command", "mvn package");
-        expectedDefault.addProperty("generateTestReport", "no");
 
         assertEquals(expectedDefault, actualDefault);
     }
@@ -53,10 +52,6 @@ public class MavenTest {
         JsonObject settings = new JsonObject();
         settings.addProperty("command", "nonsense");
         assertTrue(!maven.verifySettings(settings));
-
-        settings = new JsonObject();
-        settings.addProperty("generateTestReport", "nonsense");
-        assertTrue(!maven.verifySettings(settings));
     }
 
     @Test
@@ -64,13 +59,6 @@ public class MavenTest {
         Maven maven = new Maven();
         JsonObject settings = new JsonObject();
         settings.addProperty("command", "mvn package");
-        assertTrue(maven.verifySettings(settings));
-
-        settings.addProperty("generateTestReport", "yes");
-        assertTrue(maven.verifySettings(settings));
-
-        settings = new JsonObject();
-        settings.addProperty("generateTestReport", "no");
         assertTrue(maven.verifySettings(settings));
     }
 
