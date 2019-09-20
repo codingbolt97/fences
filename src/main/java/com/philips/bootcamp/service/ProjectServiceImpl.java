@@ -86,6 +86,8 @@ public class ProjectServiceImpl implements ProjectService {
         if (projectFolder.exists()) {
             FileUtils.deleteFolder(projectFolder);
         }
+        
+        projectFolder = new File(parent, projectName);
 
         String cloneResult = cloneGitProject(projectLink);
         if (cloneResult != null) return cloneResult;
@@ -139,10 +141,7 @@ public class ProjectServiceImpl implements ProjectService {
         command.append(" \"" + Constants.sourceDirectory.getAbsolutePath() + "\"");
         command.append(" \"git clone " + link + "\"");
         String output = TerminalUtils.run(command.toString());
-        if (output.contains("Resolving deltas: 100%")) {
-            return null;
-        }
-
+        if (output == null) return null;
         return output;
     }
 
@@ -188,14 +187,15 @@ public class ProjectServiceImpl implements ProjectService {
         JsonObject projectSettings;
 
         File projectFolder = new File(Constants.sourceDirectory, name);
+        File projectDataDirectory = new File(Constants.dataDirectory, name);
+        
         try {
-            String fileContent = FileUtils.getFileContents(new File(projectFolder, "settings.json"));
+            String fileContent = FileUtils.getFileContents(new File(projectDataDirectory, "settings.json"));
             projectSettings = parser.parse(fileContent).getAsJsonObject();
         } catch (Exception jpe) {
             return "{\"status\":\"fail\",\"error\" : \"Exception encountered while reading project settings\"}";
         }
-
-        File projectDataDirectory = new File(Constants.dataDirectory, name);
+        
         JsonObject prevReport;
         try {
             String fileContent = FileUtils.getFileContents(new File(projectDataDirectory, "report.json"));
@@ -217,7 +217,10 @@ public class ProjectServiceImpl implements ProjectService {
             JsonElement prevToolReport = prevReport.get(tool);
             if (prevToolReport != null) {
                 JsonObject comparison = getTool(tool).getInstance().compare(output, prevToolReport.getAsJsonObject());
-                comparison.add(tool, comparison);
+                comparisons.add(tool, comparison);
+            } else {
+            	JsonObject comparison = getTool(tool).getInstance().compare(output, null);
+                comparisons.add(tool, comparison);
             }
         }
 

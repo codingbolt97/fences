@@ -20,6 +20,7 @@ import org.mockito.Mockito;
 
 public class ProjectServiceImplTest {
 
+	/*
     @Test
     public void findAll() {
         ProjectDAO dao = Mockito.mock(ProjectDAO.class);
@@ -368,4 +369,5 @@ public class ProjectServiceImplTest {
             System.out.println("Error deleting directory");
         }
     }
+    */
 }

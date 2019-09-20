@@ -3,6 +3,7 @@ package com.philips.bootcamp.tools;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
+import java.text.DecimalFormat;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -161,36 +162,35 @@ public class Checkstyle implements Tool {
         JsonObject comparison = new JsonObject();
         double percentage = 0.0;
 
+        DecimalFormat df = new DecimalFormat("#.###");
+        
         if (pastReport != null && futureReport != null) {
-            int errorsThen = pastReport.get("metric").getAsJsonObject().get("errors").getAsInt();
-            int errorsNow = futureReport.get("metric").getAsJsonObject().get("errors").getAsInt();
+            int errorsThen = pastReport.get("metrics").getAsJsonObject().get("errors").getAsInt();
+            int errorsNow = futureReport.get("metrics").getAsJsonObject().get("errors").getAsInt();
 
             if (errorsThen != -1) 
                 percentage = (errorsThen - errorsNow) * 1f / (errorsThen * 1f);
 
             comparison.addProperty("errorsThen", errorsThen);
             comparison.addProperty("errorsNow", errorsNow);
-            comparison.addProperty("percentageSign", (percentage > 0.0)? "-" : "+");
-            comparison.addProperty("percentageValue", (percentage > 0.0)? percentage : percentage * -1.0);
+            comparison.addProperty("percentageChange", df.format(percentage));
 
             return comparison;
 
         } else if (pastReport == null && futureReport != null) {
-            int errorsNow = futureReport.get("metric").getAsJsonObject().get("errors").getAsInt();
+            int errorsNow = futureReport.get("metrics").getAsJsonObject().get("errors").getAsInt();
             
             comparison.addProperty("errorsThen", "null");
             comparison.addProperty("errorsNow", errorsNow);
-            comparison.addProperty("percentageSign", "null");
-            comparison.addProperty("percentageValue", "null");
+            comparison.addProperty("percentageChange", "null");
 
             return comparison;
         } else {
             comparison.addProperty("errorsThen", "null");
             comparison.addProperty("errorsNow", "null");
-            comparison.addProperty("percentageSign", "null");
-            comparison.addProperty("percentageValue", "null");
+            comparison.addProperty("percentageChange", "null");
 
-            return null;
+            return comparison;
         }
     }
 }

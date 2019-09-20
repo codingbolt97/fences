@@ -73,14 +73,15 @@ public class FileUtils {
     public static void deleteFolder(File directory) {
         if (directory == null || !directory.exists()) return;
         
-        StringBuilder command = new StringBuilder("rmdir ");
-        command.append("\"" + directory.getAbsolutePath() + "\" /q /s");
+        StringBuilder command = new StringBuilder();
+        command.append("\"" + new File(Constants.toolsDirectory, "rdir.bat").getAbsolutePath() + "\"");
+        command.append(" \"" + directory.getAbsolutePath() + "\"");
         TerminalUtils.run(command.toString());
     }
 
     public static void renameFile(File file, String newName) {
         StringBuilder command = new StringBuilder();
-        command.append("\"" + new File(Constants.toolsDirectory, "rename.bat") + "\"");
+        command.append("\"" + new File(Constants.toolsDirectory, "rename.bat").getAbsolutePath() + "\"");
         command.append(" \"" + file.getAbsolutePath() + "\"");
         command.append(" \"" + newName + "\"");
         TerminalUtils.run(command.toString());
