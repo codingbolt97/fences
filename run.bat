@@ -7,8 +7,8 @@ if "%CATALINA_HOME%" == "" (
         echo Renaming jar file
         ren fences-0.1.war fences.war
         cd ..
-        del "%CATALINA_HOME%/webapps/fences" /s /q /f
-        del "%CATALINA_HOME%/webapps/fences.war" /q /f
+        rmdir "%CATALINA_HOME%/webapps/fences" /s /q
+        del "%CATALINA_HOME%/webapps/fences.war"
         cd target
         move fences.war "%CATALINA_HOME%/webapps"
         cd ..

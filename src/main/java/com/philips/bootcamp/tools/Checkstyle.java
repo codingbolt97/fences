@@ -10,8 +10,10 @@ import javax.xml.parsers.ParserConfigurationException;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import com.philips.bootcamp.domain.Constants;
 import com.philips.bootcamp.domain.Tool;
 import com.philips.bootcamp.utils.FileUtils;
+import com.philips.bootcamp.utils.TerminalUtils;
 
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -24,7 +26,10 @@ public class Checkstyle implements Tool {
 
     public JsonObject parseXml(String out) {
         if (out == null) return null;
-        JsonObject data = new JsonObject();
+
+        int noOfErrors = 0;
+        JsonObject report = new JsonObject();
+        JsonObject metrics = new JsonObject();
 
         try {
             DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
@@ -34,6 +39,9 @@ public class Checkstyle implements Tool {
             // recommended
             document.getDocumentElement().normalize();
             NodeList files = document.getElementsByTagName("file");
+
+            noOfErrors = document.getElementsByTagName("error").getLength();
+            metrics.addProperty("errors", noOfErrors);
             
             for (int index = 0; index < files.getLength(); index++) {
 
@@ -59,9 +67,8 @@ public class Checkstyle implements Tool {
                     array.add(object);
                 }
 
-                data.add(fileLocation, array);
+                report.add(fileLocation, array);
             }
-
 
         } catch (ParserConfigurationException pce) {
             return null;
@@ -71,14 +78,20 @@ public class Checkstyle implements Tool {
             return null;
         }
         
+        JsonObject data = new JsonObject();
+        data.add("report", report);
+        data.add("metrics", metrics);
         return data;
     }
 
     @Override
     public JsonObject execute(JsonObject settings) {
         // construct command
-        StringBuilder command = new StringBuilder("java -jar ./../tools/checkstyle-8.23-all.jar");
+        StringBuilder command = new StringBuilder("java -jar");
         
+        // path to checkstyle jar
+        command.append(" \"" + new File(Constants.toolsDirectory, "checkstyle-8.23-all.jar").getAbsolutePath() + "\"");
+
         // -c ?.xml
         command.append(" -c " + settings.get("styleguide").getAsString() + ".xml");
 
@@ -88,6 +101,9 @@ public class Checkstyle implements Tool {
         // output as xml
         command.append(" -f xml");
 
+        // redirect to output file
+        command.append(" -o \"" + Constants.output.getAbsolutePath() + "\"");
+
         // exclude target folder
         command.append(" -e target");
 
@@ -96,9 +112,9 @@ public class Checkstyle implements Tool {
             command.append(" -e src/test");
 
         // run command
-        String out = run(command.toString());
-        // handle output
-        return parseXml(out);
+        TerminalUtils.run(command.toString());
+
+        return parseXml(FileUtils.getFileContents(Constants.output));
     }
 
     @Override
@@ -108,7 +124,7 @@ public class Checkstyle implements Tool {
 
     @Override
     public String getDescription() {
-        return FileUtils.getFileContents(new File(toolsDirectory, "checkstyle.desc"));
+        return FileUtils.getFileContents(new File(Constants.toolsDirectory, "checkstyle.desc"));
     }
 
     @Override
@@ -140,4 +156,41 @@ public class Checkstyle implements Tool {
         return defaults;
     }
 
+    @Override
+    public JsonObject compare(JsonObject futureReport, JsonObject pastReport) {
+        JsonObject comparison = new JsonObject();
+        double percentage = 0.0;
+
+        if (pastReport != null && futureReport != null) {
+            int errorsThen = pastReport.get("metric").getAsJsonObject().get("errors").getAsInt();
+            int errorsNow = futureReport.get("metric").getAsJsonObject().get("errors").getAsInt();
+
+            if (errorsThen != -1) 
+                percentage = (errorsThen - errorsNow) * 1f / (errorsThen * 1f);
+
+            comparison.addProperty("errorsThen", errorsThen);
+            comparison.addProperty("errorsNow", errorsNow);
+            comparison.addProperty("percentageSign", (percentage > 0.0)? "-" : "+");
+            comparison.addProperty("percentageValue", (percentage > 0.0)? percentage : percentage * -1.0);
+
+            return comparison;
+
+        } else if (pastReport == null && futureReport != null) {
+            int errorsNow = futureReport.get("metric").getAsJsonObject().get("errors").getAsInt();
+            
+            comparison.addProperty("errorsThen", "null");
+            comparison.addProperty("errorsNow", errorsNow);
+            comparison.addProperty("percentageSign", "null");
+            comparison.addProperty("percentageValue", "null");
+
+            return comparison;
+        } else {
+            comparison.addProperty("errorsThen", "null");
+            comparison.addProperty("errorsNow", "null");
+            comparison.addProperty("percentageSign", "null");
+            comparison.addProperty("percentageValue", "null");
+
+            return null;
+        }
+    }
 }

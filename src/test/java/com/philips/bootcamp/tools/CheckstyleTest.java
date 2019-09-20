@@ -7,7 +7,7 @@ import static org.junit.Assert.assertTrue;
 import java.io.File;
 
 import com.google.gson.JsonObject;
-import com.philips.bootcamp.domain.Tool;
+import com.philips.bootcamp.domain.Constants;
 import com.philips.bootcamp.utils.FileUtils;
 
 import org.junit.Test;
@@ -23,7 +23,7 @@ public class CheckstyleTest {
 
     @Test
     public void getDescriptionReturnsContensOfCheckstyle_dot_desc() {
-        File checkstyleDesc = new File(Tool.toolsDirectory, "checkstyle.desc");
+        File checkstyleDesc = new File(Constants.toolsDirectory, "checkstyle.desc");
         String checkstyleDescContents = FileUtils.getFileContents(checkstyleDesc);
         Checkstyle checkstyle = new Checkstyle();
         assertEquals(checkstyleDescContents, checkstyle.getDescription());
@@ -85,8 +85,8 @@ public class CheckstyleTest {
         settings.addProperty("excludeTestFiles", "no");
         settings.addProperty("project", "test");
         JsonObject returnValue = new JsonObject();
-        Mockito.when(cs.run("java -jar ./../tools/checkstyle-8.23-all.jar -c sun_checks.xml \"test\" -f xml -e target"))
-            .thenReturn("value");
+        //Mockito.when(TerminalUtils.run("java -jar ./../tools/checkstyle-8.23-all.jar -c sun_checks.xml \"test\" -f xml -e target"))
+        //    .thenReturn("value");
         Mockito.when(cs.parseXml("value")).thenReturn(returnValue);
         Mockito.when(cs.execute(settings)).thenCallRealMethod();
 

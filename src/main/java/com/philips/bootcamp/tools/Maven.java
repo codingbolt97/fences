@@ -3,8 +3,10 @@ package com.philips.bootcamp.tools;
 import java.io.File;
 
 import com.google.gson.JsonObject;
+import com.philips.bootcamp.domain.Constants;
 import com.philips.bootcamp.domain.Tool;
 import com.philips.bootcamp.utils.FileUtils;
+import com.philips.bootcamp.utils.TerminalUtils;
 
 public class Maven implements Tool {
 
@@ -15,9 +17,7 @@ public class Maven implements Tool {
         command.append(" \"" + settings.get("project").getAsString() + "\"");
         command.append(" \"" + settings.get("command").getAsString() + "\"");
 
-        System.out.println(command.toString());
-        String out = run(command.toString());
-        System.out.println(out);
+        String out = TerminalUtils.run(command.toString());
         return handleOutput(out);
     }
 
@@ -40,7 +40,7 @@ public class Maven implements Tool {
 
     @Override
     public String getDescription() {
-        return FileUtils.getFileContents(new File(toolsDirectory, "maven.desc"));
+        return FileUtils.getFileContents(new File(Constants.toolsDirectory, "maven.desc"));
     }
 
     @Override
@@ -63,5 +63,10 @@ public class Maven implements Tool {
         JsonObject defaults = new JsonObject();
         defaults.addProperty("command", "mvn package");
         return defaults;
+    }
+
+    @Override
+    public JsonObject compare(JsonObject futureReport, JsonObject pastReport) {
+        return null;
     }
 }

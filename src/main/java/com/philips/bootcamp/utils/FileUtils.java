@@ -11,6 +11,8 @@ import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 
+import com.philips.bootcamp.domain.Constants;
+
 public class FileUtils {
     public static String getFileContents(File file) {
         if (file != null && file.exists() && Files.isExecutable(file.toPath())) {
@@ -66,5 +68,21 @@ public class FileUtils {
             }
             Files.delete(path);
         }
+    }
+
+    public static void deleteFolder(File directory) {
+        if (directory == null || !directory.exists()) return;
+        
+        StringBuilder command = new StringBuilder("rmdir ");
+        command.append("\"" + directory.getAbsolutePath() + "\" /q /s");
+        TerminalUtils.run(command.toString());
+    }
+
+    public static void renameFile(File file, String newName) {
+        StringBuilder command = new StringBuilder();
+        command.append("\"" + new File(Constants.toolsDirectory, "rename.bat") + "\"");
+        command.append(" \"" + file.getAbsolutePath() + "\"");
+        command.append(" \"" + newName + "\"");
+        TerminalUtils.run(command.toString());
     }
 }

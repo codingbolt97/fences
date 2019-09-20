@@ -9,15 +9,17 @@ import com.philips.bootcamp.domain.Project;
 import com.philips.bootcamp.tools.ToolName;
 
 public interface ProjectService {
-    String buildProject(String name);
+    String fenceProject(String name);
     List<Project> findAll();
     Project find(String name);
-    boolean save(String project);
+    String save(String project);
     boolean delete(String name);
 
-    boolean updateSettings(String name, String settings);
+    String updateSettings(String name, String settings);
     String getReport(String name);
     String getSettings(String name);
+
+    String getInstantReport(String toolname, String source);
 
     default String getTools() {
         JsonParser parser = new JsonParser();

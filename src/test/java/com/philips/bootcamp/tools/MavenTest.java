@@ -7,7 +7,7 @@ import static org.junit.Assert.assertTrue;
 import java.io.File;
 
 import com.google.gson.JsonObject;
-import com.philips.bootcamp.domain.Tool;
+import com.philips.bootcamp.domain.Constants;
 import com.philips.bootcamp.utils.FileUtils;
 
 import org.junit.Test;
@@ -23,7 +23,7 @@ public class MavenTest {
 
     @Test
     public void getDescriptionReturnsContensOfCheckstyle_dot_desc() {
-        File mavenDesc = new File(Tool.toolsDirectory, "maven.desc");
+        File mavenDesc = new File(Constants.toolsDirectory, "maven.desc");
         String mavenDescContents = FileUtils.getFileContents(mavenDesc);
         Maven maven = new Maven();
         assertEquals(mavenDescContents, maven.getDescription());
@@ -72,7 +72,7 @@ public class MavenTest {
 
         JsonObject returnValue = new JsonObject();
         Mockito.when(maven.handleOutput("BUILD SUCCESSFUL")).thenReturn(returnValue);
-        Mockito.when(maven.run("\"./../tools/maven.bat\" \"test\" \"mvn compile\"")).thenReturn("BUILD SUCCESSFUL");
+        //Mockito.when(maven.run("\"./../tools/maven.bat\" \"test\" \"mvn compile\"")).thenReturn("BUILD SUCCESSFUL");
         Mockito.when(maven.execute(settings)).thenCallRealMethod();
 
         assertEquals(returnValue, maven.execute(settings));

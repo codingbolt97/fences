@@ -42,12 +42,12 @@ public class ProjectController {
     @RequestMapping(value = "/api/project", method = RequestMethod.POST)
     public ResponseEntity<Object> createNewProject(@RequestBody String project) {
         
-        boolean result = service.save(project);
-        if (result) {
-            return new ResponseEntity<>(HttpStatus.CREATED);
+        String result = service.save(project);
+        if (result.equals("Project created") || result.equals("Project updated")) {
+            return new ResponseEntity<>(result, HttpStatus.CREATED);
         } else {
-            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
-        }        
+            return new ResponseEntity<>(result, HttpStatus.BAD_REQUEST);
+        }
     }
 
     @RequestMapping(value = "/api/project/{name}", method = RequestMethod.DELETE)
@@ -70,33 +70,44 @@ public class ProjectController {
     }
 
     @RequestMapping(value = "/api/project/{name}/settings", method = RequestMethod.POST)
-    public ResponseEntity<Object> updateProjectSettings(@PathVariable("name") String project, @RequestBody String settings) {
-        boolean result = service.updateSettings(project, settings);
-        if (result) {
-            return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+    public ResponseEntity<String> updateProjectSettings(@PathVariable("name") String project, @RequestBody String settings) {
+        String result = service.updateSettings(project, settings);
+        if (result.equals("Project settings updated")) {
+            return new ResponseEntity<>(result, HttpStatus.NO_CONTENT);
+        } else if (result.equals("anObject")) {
+            return new ResponseEntity<>(result, HttpStatus.NO_CONTENT);
         }
 
-        return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+        return new ResponseEntity<>(result, HttpStatus.BAD_REQUEST);
     }
 
     @RequestMapping(value = "/api/project/{name}/settings", method = RequestMethod.GET)
     public ResponseEntity<String> getProjectSettings(@PathVariable("name") String name) {
+        List<String> errors = List.of("Project name required", "No project by name: " + name);
         String settings = service.getSettings(name);
-        if (settings == null) return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+        if (errors.contains(settings)) return new ResponseEntity<>(settings, HttpStatus.BAD_REQUEST);
+        if (settings.equals("File not present")) return new ResponseEntity<>(settings, HttpStatus.NOT_FOUND);
 
         return new ResponseEntity<>(settings, HttpStatus.OK);
     }
 
     @RequestMapping(value = "/api/project/{name}/report", method = RequestMethod.GET)
     public ResponseEntity<String> getProjectReport(@PathVariable("name") String name) {
+        List<String> errors = List.of("Project name required", "No project by name: " + name);
         String report = service.getReport(name);
-        if (report == null) return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+        if (errors.contains(report)) return new ResponseEntity<>(report, HttpStatus.BAD_REQUEST);
+        if (report.equals("File not present")) return new ResponseEntity<>(report, HttpStatus.NOT_FOUND);
 
         return new ResponseEntity<>(report, HttpStatus.OK);
     }
 
-    @RequestMapping(value = "/api/project/{name}/build", method = RequestMethod.GET)
-    public String buildProject(@PathVariable("name") String name) {
-        return service.buildProject(name);
+    @RequestMapping(value = "/api/project/{name}/fence", method = RequestMethod.GET)
+    public String fenceProject(@PathVariable("name") String name) {
+        return service.fenceProject(name);
+    }
+
+    @RequestMapping(value = "/api/tool/{name}", method = RequestMethod.POST)
+    public String getInstantReport(@PathVariable("name") String toolname, @RequestBody String source) {
+        return service.getInstantReport(toolname, source);
     }
 }

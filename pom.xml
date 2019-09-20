@@ -12,6 +12,10 @@
   <!-- FIXME change it to the project's website -->
   <url>http://www.example.com</url>
 
+  <properties>
+    <maven.test.skip>true</maven.test.skip>
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>mysql</groupId>

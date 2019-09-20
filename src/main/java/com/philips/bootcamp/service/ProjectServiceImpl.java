@@ -1,8 +1,6 @@
 package com.philips.bootcamp.service;
 
 import java.io.File;
-import java.io.IOException;
-import java.nio.file.Path;
 import java.sql.Date;
 import java.util.HashSet;
 import java.util.List;
@@ -13,10 +11,13 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
 import com.philips.bootcamp.dal.ProjectDAO;
+import com.philips.bootcamp.domain.Constants;
 import com.philips.bootcamp.domain.Project;
 import com.philips.bootcamp.domain.Tool;
 import com.philips.bootcamp.tools.ToolName;
 import com.philips.bootcamp.utils.FileUtils;
+import com.philips.bootcamp.utils.StringUtils;
+import com.philips.bootcamp.utils.TerminalUtils;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -27,14 +28,14 @@ public class ProjectServiceImpl implements ProjectService {
     @Autowired
     ProjectDAO projectDAO;
 
-    File parent = new File("./../sources");
+    File parent = Constants.sourceDirectory;
 
     public void setProjectDAO(ProjectDAO projectDAO) {
         this.projectDAO = projectDAO;
     }
 
-    public void setParentFile(File file) {
-        parent = file;
+    public void setParentFile(File parent) {
+        this.parent = parent;
     }
 
     @Override
@@ -48,8 +49,8 @@ public class ProjectServiceImpl implements ProjectService {
     }
 
     @Override
-    public boolean save(String project) {
-        if (project == null) return false;
+    public String save(String project) {
+        if (project == null) return "Invalid project json";
 
         JsonParser parser = new JsonParser();
         JsonObject projectJsonObject = new JsonObject();
@@ -57,25 +58,40 @@ public class ProjectServiceImpl implements ProjectService {
         try {
             projectJsonObject = parser.parse(project).getAsJsonObject();
         } catch (JsonParseException|IllegalStateException exception) {
-            return false;
+            return "Invalid project json";
         }
 
-        if (projectJsonObject == null) return false;
+        if (projectJsonObject == null) return "Invalid project json";
+
+        if (!projectJsonObject.has("link")) return "Project json must have property 'link'";
+        if (!projectJsonObject.has("branch")) return "Project json must have property 'branch'";
+
+        String projectLink = projectJsonObject.get("link").getAsString();
+        String projectName = StringUtils.getProjectNameFromHttpLink(projectLink);
+        if (projectName == null) return "Illegal property value for 'link'"; 
+
+        String projectBranch = projectJsonObject.get("branch").getAsString();
+        if (projectBranch == null) return "Illegal property value for 'branch'";
 
         Project projectObject = new Project();
-        if (!projectJsonObject.has("project_name")) return false;
-        String projectName = projectJsonObject.get("project_name").getAsString();
-
-        File projectFolder = new File(parent, projectName);
-        
-        if (!projectFolder.exists() || !projectFolder.isDirectory()) return false;
-
         Project existing = find(projectName);
-        if (existing != null) return false;
+        if (existing == null) {
+            projectObject.setName(projectName + "-" + projectBranch);
+            projectObject.setProjectCreationDate(new Date(System.currentTimeMillis()));
+            projectDAO.save(projectObject);
+        }
 
-        projectObject.setName(projectName);
-        projectObject.setProjectCreationDate(new Date(System.currentTimeMillis()));
-        projectDAO.save(projectObject);
+        File projectFolder = new File(parent, projectName + "-" + projectBranch);
+        
+        if (projectFolder.exists()) {
+            FileUtils.deleteFolder(projectFolder);
+        }
+
+        String cloneResult = cloneGitProject(projectLink);
+        if (cloneResult != null) return cloneResult;
+
+        FileUtils.renameFile(projectFolder, projectName + "-" + projectBranch);
+        switchBranch(projectName + "-" + projectBranch, projectBranch);
 
         // refactor this
         if (projectJsonObject.has("settings")) {
@@ -107,11 +123,35 @@ public class ProjectServiceImpl implements ProjectService {
                 effectiveSettings.add(tool, object);
             }
             
-            File settingsJson = new File(projectFolder, "settings.json");
+            File settingsFolder = new File(Constants.dataDirectory, projectName + "-" + projectBranch);
+            settingsFolder.mkdir();
+
+            File settingsJson = new File(settingsFolder, "settings.json");
             FileUtils.writeFileContents(settingsJson, effectiveSettings.toString());
         }
 
-        return true;
+        return (existing == null)? "Project created" : "Project updated";
+    }
+
+    private String cloneGitProject(String link) {
+        StringBuilder command = new StringBuilder();
+        command.append("\"" + new File(Constants.toolsDirectory, "action.bat").getAbsolutePath() + "\"");
+        command.append(" \"" + Constants.sourceDirectory.getAbsolutePath() + "\"");
+        command.append(" \"git clone " + link + "\"");
+        String output = TerminalUtils.run(command.toString());
+        if (output.contains("Resolving deltas: 100%")) {
+            return null;
+        }
+
+        return output;
+    }
+
+    private void switchBranch(String project, String branch) {
+        StringBuilder command = new StringBuilder();
+        command.append("\"" + new File(Constants.toolsDirectory, "switch.bat").getAbsolutePath() + "\"");
+        command.append(" \"" + new File(Constants.sourceDirectory, project).getAbsolutePath() + "\"");
+        command.append(" " + branch);
+        TerminalUtils.run(command.toString());
     }
 
     private ToolName getTool(String toolname) {
@@ -129,62 +169,87 @@ public class ProjectServiceImpl implements ProjectService {
         Project existing = find(name);
         if (existing == null) return false;
 
-        Path path = new File(parent, name).toPath();
-        try { FileUtils.deleteDirectoryRecursion(path); } 
-        catch (IOException ioe) { ; }
+        File folder = new File(Constants.sourceDirectory, name);
+        FileUtils.deleteFolder(folder);
+
+        folder = new File(Constants.dataDirectory, name);
+        FileUtils.deleteFolder(folder);
 
         projectDAO.delete(name);
         return true;
     }
 
     @Override
-    public String buildProject(String name) {
+    public String fenceProject(String name) {
         Project project = find(name);
-        if (project == null) return "{\"error\" : \"No project found with the name: " + name + "\"}";
+        if (project == null) return "{\"status\":\"fail\",\"error\" : \"No project found with the name: " + name + "\"}";
 
         JsonParser parser = new JsonParser();
         JsonObject projectSettings;
 
-        File projectFolder = new File(parent, name);
+        File projectFolder = new File(Constants.sourceDirectory, name);
         try {
             String fileContent = FileUtils.getFileContents(new File(projectFolder, "settings.json"));
             projectSettings = parser.parse(fileContent).getAsJsonObject();
         } catch (Exception jpe) {
-            return "{\"error\" : \"Exception encountered while reading project settings\"}";
+            return "{\"status\":\"fail\",\"error\" : \"Exception encountered while reading project settings\"}";
         }
 
+        File projectDataDirectory = new File(Constants.dataDirectory, name);
+        JsonObject prevReport;
+        try {
+            String fileContent = FileUtils.getFileContents(new File(projectDataDirectory, "report.json"));
+            prevReport = parser.parse(fileContent).getAsJsonObject(); 
+        } catch (Exception e) {
+            prevReport = new JsonObject();
+        }
+
+        JsonObject comparisons = new JsonObject();
         JsonObject report = new JsonObject();
+
         Set<String> tools = projectSettings.keySet();
         for (String tool : tools) {
             JsonObject toolSettings = projectSettings.get(tool).getAsJsonObject();
             toolSettings.addProperty("project", projectFolder.getAbsolutePath());
             JsonObject output = getTool(tool).getInstance().execute(toolSettings);
             report.add(tool, output);
+
+            JsonElement prevToolReport = prevReport.get(tool);
+            if (prevToolReport != null) {
+                JsonObject comparison = getTool(tool).getInstance().compare(output, prevToolReport.getAsJsonObject());
+                comparison.add(tool, comparison);
+            }
         }
 
-        FileUtils.writeFileContents(new File(projectFolder, "report.json"), report.toString());
+        FileUtils.writeFileContents(new File(projectDataDirectory, "report.json"), report.toString());
         project.setLastBuildDate(new Date(System.currentTimeMillis()));
         projectDAO.update(project);
 
-        return "{\"error\" : \"none\"}";
+        return "{\"status\":\"pass\",\"report\" : " + comparisons.toString() + "}";
     }
 
     @Override
-    public boolean updateSettings(String name, String settings) {
-        if (name == null || settings == null) return false;
+    public String updateSettings(String name, String settings) {
+        if (name == null) return "Project name required";
+        if (settings == null) return "No settings provided";
 
         Project project = find(name);
-        if (project == null) return false;
+        if (project == null) return "No project found with name: " + name;
 
         JsonParser parser = new JsonParser();
         JsonObject projectSettings = null, actualProjectSettings = null;
 
-        File projectDirectoy = new File(parent, name);
+        File projectDataDirectory = new File(Constants.dataDirectory, name);
         try {
             projectSettings = parser.parse(settings).getAsJsonObject();
-            actualProjectSettings = parser.parse(FileUtils.getFileContents(new File(projectDirectoy, "settings.json"))).getAsJsonObject();
         } catch(Exception exception) {
-            return false;
+            return "Invalid settings json string";
+        }
+
+        try {
+            actualProjectSettings = parser.parse(FileUtils.getFileContents(new File(projectDataDirectory, "settings.json"))).getAsJsonObject();
+        } catch(Exception exception) {
+            actualProjectSettings = new JsonObject();
         }
 
         // projectSettings : { "checkstyle" : {}, "pmd" : {}}
@@ -203,7 +268,7 @@ public class ProjectServiceImpl implements ProjectService {
             if (actualToolElement == null) {
                 // add the tool with default settings to actualProjectSettings
                 actualProjectSettings.add(tool, toolInstance.getDefaultSettings());
-            } 
+            }
 
             JsonObject actualToolSettings = actualProjectSettings.get(tool).getAsJsonObject();
             updateToolSettings(actualToolSettings, toolSettings);
@@ -214,8 +279,8 @@ public class ProjectServiceImpl implements ProjectService {
             actualProjectSettings.remove(tool);
         }
 
-        FileUtils.writeFileContents(new File(projectDirectoy, "settings.json"), actualProjectSettings.toString());
-        return true;
+        FileUtils.writeFileContents(new File(projectDataDirectory, "settings.json"), actualProjectSettings.toString());
+        return "Project settings updated";
     }
 
     private Set<String> setDifference(Set<String> setA, Set<String> setB) {
@@ -247,14 +312,32 @@ public class ProjectServiceImpl implements ProjectService {
     }
 
     private String getFile(String projectName, String fileName) {
-        if (projectName == null) return null;
+        if (projectName == null) return "Project name required";
         
         Project project = find(projectName);
-        if (project == null) return null;
+        if (project == null) return "No project by name: " + projectName;
         
-        File report = new File(parent, projectName + "/" + fileName);
-        if (!report.exists()) return null;
+        File file = new File(Constants.dataDirectory, projectName + "/" + fileName);
+        if (!file.exists()) return "File not present";
 
-        return FileUtils.getFileContents(report);
+        return FileUtils.getFileContents(file);
+    }
+
+    @Override
+    public String getInstantReport(String toolname, String source) {
+        if (toolname == null) return "{\"error\" : \"Invalid toolname\"}";
+        if (source == null) return "{\"error\" : \"No content provided\"}";
+
+        ToolName toolName = getTool(toolname);
+        if (toolName == null) return "{\"error\" : \"No such tool\"}";
+
+        File testFile = new File(Constants.sampleDirectory, "Test.java");
+        FileUtils.writeFileContents(testFile, source);
+        Tool tool = toolName.getInstance();
+        JsonObject defaultSettings = tool.getDefaultSettings();
+        defaultSettings.addProperty("project", Constants.sampleDirectory.getAbsolutePath());
+        JsonObject report = tool.execute(defaultSettings);
+        report.addProperty("error", "none");
+        return report.toString();
     }
 }

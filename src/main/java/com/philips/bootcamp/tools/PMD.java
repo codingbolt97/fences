@@ -11,8 +11,10 @@ import javax.xml.parsers.ParserConfigurationException;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import com.philips.bootcamp.domain.Constants;
 import com.philips.bootcamp.domain.Tool;
 import com.philips.bootcamp.utils.FileUtils;
+import com.philips.bootcamp.utils.TerminalUtils;
 
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -25,7 +27,9 @@ public class PMD implements Tool {
 
     public JsonObject parseXml(String out) {
         if (out == null) return null;
-        JsonObject data = new JsonObject();
+        
+        JsonObject report = new JsonObject();
+        JsonObject metrics = new JsonObject();
 
         try {
             DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
@@ -35,6 +39,9 @@ public class PMD implements Tool {
             // recommended
             document.getDocumentElement().normalize();
             NodeList files = document.getElementsByTagName("file");
+
+            int noOfViolations = document.getElementsByTagName("violation").getLength();
+            metrics.addProperty("errors", noOfViolations);
             
             for (int index = 0; index < files.getLength(); index++) {
 
@@ -60,7 +67,7 @@ public class PMD implements Tool {
                     array.add(object);
                 }
 
-                data.add(fileLocation, array);
+                report.add(fileLocation, array);
             }
 
         } catch (ParserConfigurationException pce) {
@@ -71,18 +78,23 @@ public class PMD implements Tool {
             return null;
         }
 
+        JsonObject data = new JsonObject();
+        data.add("report", report);
+        data.add("metrics", metrics);
         return data;
     }
 
     @Override
     public JsonObject execute(JsonObject settings) {
-        StringBuilder command = new StringBuilder("\"./../tools/pmd/bin/pmd.bat\"");
+        StringBuilder command = new StringBuilder();
+        command.append("\"" + new File(Constants.toolsDirectory, "pmd/bin/pmd.bat").getAbsolutePath() + "\"");
         command.append(" -d " + "\"" + settings.get("project").getAsString() + "\"");
         command.append(" -R " + settings.get("ruleset").getAsString());
         command.append(" -f xml");
+        command.append(" -r " + "\"" + Constants.output.getAbsolutePath() + "\"");
 
-        String out = run(command.toString());
-        return parseXml(out);
+        TerminalUtils.run(command.toString());
+        return parseXml(FileUtils.getFileContents(Constants.output));
     }
 
     @Override
@@ -92,7 +104,7 @@ public class PMD implements Tool {
 
     @Override
     public String getDescription() {
-        return FileUtils.getFileContents(new File(toolsDirectory, "pmd.desc"));
+        return FileUtils.getFileContents(new File(Constants.toolsDirectory, "pmd.desc"));
     }
 
     @Override
@@ -103,9 +115,10 @@ public class PMD implements Tool {
         String value = null;
         if (settings.has("ruleset")) {
             value = settings.get("ruleset").getAsString();
-            if (rulesets.contains(value)) ;
-            else return false;
+            if (!rulesets.contains(value)) ;
+                return false;
         }
+
         return true;
     }
 
@@ -116,4 +129,41 @@ public class PMD implements Tool {
         return defaults;
     }
     
+    @Override
+    public JsonObject compare(JsonObject futureReport, JsonObject pastReport) {
+        JsonObject comparison = new JsonObject();
+        double percentage = 0.0;
+
+        if (pastReport != null && futureReport != null) {
+            int errorsThen = pastReport.get("metric").getAsJsonObject().get("errors").getAsInt();
+            int errorsNow = futureReport.get("metric").getAsJsonObject().get("errors").getAsInt();
+
+            if (errorsThen != -1) 
+                percentage = (errorsThen - errorsNow) * 1f / (errorsThen * 1f);
+
+            comparison.addProperty("errorsThen", errorsThen);
+            comparison.addProperty("errorsNow", errorsNow);
+            comparison.addProperty("percentageSign", (percentage > 0.0)? "-" : "+");
+            comparison.addProperty("percentageValue", (percentage > 0.0)? percentage : percentage * -1.0);
+
+            return comparison;
+
+        } else if (pastReport == null && futureReport != null) {
+            int errorsNow = futureReport.get("metric").getAsJsonObject().get("errors").getAsInt();
+            
+            comparison.addProperty("errorsThen", "null");
+            comparison.addProperty("errorsNow", errorsNow);
+            comparison.addProperty("percentageSign", "null");
+            comparison.addProperty("percentageValue", "null");
+
+            return comparison;
+        } else {
+            comparison.addProperty("errorsThen", "null");
+            comparison.addProperty("errorsNow", "null");
+            comparison.addProperty("percentageSign", "null");
+            comparison.addProperty("percentageValue", "null");
+
+            return null;
+        }
+    }
 }

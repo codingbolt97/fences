@@ -18,7 +18,6 @@ public class Project {
     @Column(name = "LAST_BUILD_DATE")
     Date lastBuildDate;
 
-
     public String getName() {
         return name;
     }

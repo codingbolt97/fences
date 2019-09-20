@@ -7,7 +7,7 @@ import static org.junit.Assert.assertTrue;
 import java.io.File;
 
 import com.google.gson.JsonObject;
-import com.philips.bootcamp.domain.Tool;
+import com.philips.bootcamp.domain.Constants;
 import com.philips.bootcamp.utils.FileUtils;
 
 import org.junit.Test;
@@ -23,7 +23,7 @@ public class PmdTest {
 
     @Test
     public void getDescriptionReturnsContensOfCheckstyle_dot_desc() {
-        File pmdDesc = new File(Tool.toolsDirectory, "pmd.desc");
+        File pmdDesc = new File(Constants.toolsDirectory, "pmd.desc");
         String pmdDescContents = FileUtils.getFileContents(pmdDesc);
         PMD pmd = new PMD();
         assertEquals(pmdDescContents, pmd.getDescription());
@@ -69,8 +69,8 @@ public class PmdTest {
         settings.addProperty("ruleset", "rulesets/java/quickstart.xml");
         settings.addProperty("project", "test");
         JsonObject returnValue = new JsonObject();
-        Mockito.when(pmd.run("\"./../tools/pmd/bin/pmd.bat\" -d \"test\" -R rulesets/java/quickstart.xml -f xml"))
-            .thenReturn("value");
+        //Mockito.when(pmd.run("\"./../tools/pmd/bin/pmd.bat\" -d \"test\" -R rulesets/java/quickstart.xml -f xml"))
+        //    .thenReturn("value");
         Mockito.when(pmd.parseXml("value")).thenReturn(returnValue);
         Mockito.when(pmd.execute(settings)).thenCallRealMethod();
 
